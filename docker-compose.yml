@@ -1,0 +1,15 @@
+# for Watermill development purposes.
+# For Watermill based application docker please check https://watermill.io/docs/getting-started/
+
+version: '3'
+services:
+  pulsar:
+    image: apachepulsar/pulsar
+    ports:
+      - "0.0.0.0:6650:6650"
+      - "0.0.0.0:8080:8080"
+    restart: unless-stopped
+    ulimits:
+      nofile:
+        soft: 65536
+        hard: 65536
