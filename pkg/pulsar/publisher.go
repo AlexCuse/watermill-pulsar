@@ -12,7 +12,8 @@ import (
 // PublisherConfig is the configuration to create a publisher
 type PublisherConfig struct {
 	// URL is the Pulsar URL.
-	URL string
+	URL            string
+	Authentication pulsar.Authentication
 }
 
 // Publisher provides the pulsar implementation for watermill publish operations
@@ -26,7 +27,8 @@ type Publisher struct {
 // NewPublisher creates a new Publisher.
 func NewPublisher(config PublisherConfig, logger watermill.LoggerAdapter) (*Publisher, error) {
 	conn, err := pulsar.NewClient(pulsar.ClientOptions{
-		URL: config.URL,
+		URL:            config.URL,
+		Authentication: config.Authentication,
 	})
 	if err != nil {
 		return nil, errors.Wrap(err, "cannot connect to nats")
