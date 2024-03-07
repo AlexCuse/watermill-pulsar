@@ -2,18 +2,16 @@ package pulsar
 
 import (
 	"context"
-
+	"errors"
 	"github.com/ThreeDotsLabs/watermill"
 	"github.com/ThreeDotsLabs/watermill/message"
 	"github.com/apache/pulsar-client-go/pulsar"
-	"github.com/pkg/errors"
 )
 
 // PublisherConfig is the configuration to create a publisher
 type PublisherConfig struct {
 	// URL is the Pulsar URL.
-	URL            string
-	Authentication pulsar.Authentication
+	URL string
 }
 
 // Publisher provides the pulsar implementation for watermill publish operations
@@ -27,17 +25,16 @@ type Publisher struct {
 // NewPublisher creates a new Publisher.
 func NewPublisher(config PublisherConfig, logger watermill.LoggerAdapter) (*Publisher, error) {
 	conn, err := pulsar.NewClient(pulsar.ClientOptions{
-		URL:            config.URL,
-		Authentication: config.Authentication,
+		URL: config.URL,
 	})
 	if err != nil {
-		return nil, errors.Wrap(err, "cannot connect to nats")
+		return nil, errors.Join(err, errors.New("cannot connect to pulsar"))
 	}
 
 	return NewPublisherWithPulsarClient(conn, logger)
 }
 
-// NewPublisherWithPulsarClient creates a new Publisher with the provided nats connection.
+// NewPublisherWithPulsarClient creates a new Publisher with the provided pulsar connection.
 func NewPublisherWithPulsarClient(conn pulsar.Client, logger watermill.LoggerAdapter) (*Publisher, error) {
 	if logger == nil {
 		logger = watermill.NopLogger{}
@@ -52,7 +49,7 @@ func NewPublisherWithPulsarClient(conn pulsar.Client, logger watermill.LoggerAda
 
 // Publish publishes message to Pulsar.
 //
-// Publish will not return until an ack has been received from JetStream.
+// Publish will not return until an ack has been received from Pulsar.
 // When one of messages delivery fails - function is interrupted.
 func (p *Publisher) Publish(topic string, messages ...*message.Message) error {
 	ctx, cancel := context.WithCancel(context.Background())
