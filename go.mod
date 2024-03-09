@@ -4,7 +4,7 @@ go 1.21
 
 require (
 	github.com/ThreeDotsLabs/watermill v1.3.5
-	github.com/apache/pulsar-client-go v0.12.0
+	github.com/apache/pulsar-client-go v0.12.1
 )
 
 require (
