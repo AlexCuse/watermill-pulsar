@@ -10,18 +10,16 @@ import (
 	"sync"
 )
 
+var _ message.Subscriber = &Subscriber{}
+
 // SubscriberConfig is the configuration to create a subscriber
 type SubscriberConfig struct {
 	// URL is the URL to the broker
 	URL string
-}
-
-// SubscriptionConfig is the configuration to customize the subscription behaviour.
-type SubscriptionConfig struct {
-	// SubscriptionName is the name of the subscription.
-	SubscriptionName string
-	// SubscriptionType is the type of the subscription.
-	SubscriptionType pulsar.SubscriptionType
+	// SubscriberName is the name of the subscription.
+	SubscriberName string
+	// SubscriberType is the type of the subscription.
+	SubscriberType pulsar.SubscriptionType
 }
 
 // Subscriber provides the pulsar implementation for watermill subscribe operations
@@ -37,6 +35,8 @@ type Subscriber struct {
 	outputsWg        sync.WaitGroup
 	SubscribersCount int
 	clientID         string
+
+	config SubscriberConfig
 }
 
 // NewSubscriber creates a new Subscriber.
@@ -47,11 +47,11 @@ func NewSubscriber(config SubscriberConfig, logger watermill.LoggerAdapter) (*Su
 	if err != nil {
 		return nil, errors.Join(err, errors.New("cannot connect to Pulsar"))
 	}
-	return NewSubscriberWithPulsarClient(conn, logger)
+	return NewSubscriberWithPulsarClient(conn, config, logger)
 }
 
 // NewSubscriberWithPulsarClient creates a new Subscriber with the provided pulsar client.
-func NewSubscriberWithPulsarClient(conn pulsar.Client, logger watermill.LoggerAdapter) (*Subscriber, error) {
+func NewSubscriberWithPulsarClient(conn pulsar.Client, config SubscriberConfig, logger watermill.LoggerAdapter) (*Subscriber, error) {
 	if logger == nil {
 		logger = watermill.NopLogger{}
 	}
@@ -62,11 +62,12 @@ func NewSubscriberWithPulsarClient(conn pulsar.Client, logger watermill.LoggerAd
 		closing:  make(chan struct{}),
 		clientID: watermill.NewULID(),
 		subs:     make(map[string]pulsar.Consumer),
+		config:   config,
 	}, nil
 }
 
 // Subscribe subscribes messages from Pulsar.
-func (s *Subscriber) Subscribe(ctx context.Context, topic string, config SubscriptionConfig) (<-chan *message.Message, error) {
+func (s *Subscriber) Subscribe(ctx context.Context, topic string) (<-chan *message.Message, error) {
 	output := make(chan *message.Message)
 
 	s.subsLock.Lock()
@@ -75,15 +76,15 @@ func (s *Subscriber) Subscribe(ctx context.Context, topic string, config Subscri
 	sub, found := s.subs[topic]
 
 	subscriptionName := fmt.Sprintf("%s-%s", topic, s.clientID)
-	if config.SubscriptionName != "" {
-		subscriptionName = config.SubscriptionName
+	if s.config.SubscriberName != "" {
+		subscriptionName = s.config.SubscriberName
 	}
 
 	if !found {
 		sb, err := s.conn.Subscribe(pulsar.ConsumerOptions{
 			Topic:            topic,
 			SubscriptionName: subscriptionName,
-			Type:             config.SubscriptionType,
+			Type:             s.config.SubscriberType,
 			MessageChannel:   make(chan pulsar.ConsumerMessage, 10),
 		})
 
