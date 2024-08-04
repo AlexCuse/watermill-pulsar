@@ -2,33 +2,24 @@ package pulsar
 
 import (
 	"context"
+	"errors"
 	"fmt"
-	"sync"
-
 	"github.com/ThreeDotsLabs/watermill"
 	"github.com/ThreeDotsLabs/watermill/message"
 	"github.com/apache/pulsar-client-go/pulsar"
-	"github.com/pkg/errors"
+	"sync"
 )
+
+var _ message.Subscriber = &Subscriber{}
 
 // SubscriberConfig is the configuration to create a subscriber
 type SubscriberConfig struct {
 	// URL is the URL to the broker
 	URL string
-
-	// QueueGroup is the JetStream queue group.
-	//
-	// All subscriptions with the same queue name (regardless of the connection they originate from)
-	// will form a queue group. Each message will be delivered to only one subscriber per queue group,
-	// using queuing semantics.
-	//
-	// It is recommended to set it with DurableName.
-	// For non durable queue subscribers, when the last member leaves the group,
-	// that group is removed. A durable queue group (DurableName) allows you to have all members leave
-	// but still maintain state. When a member re-joins, it starts at the last position in that group.
-	//
-	// When QueueGroup is empty, subscribe without QueueGroup will be used.
-	QueueGroup string
+	// SubscriberName is the name of the subscription.
+	SubscriberName string
+	// SubscriberType is the type of the subscription.
+	SubscriberType pulsar.SubscriptionType
 }
 
 // Subscriber provides the pulsar implementation for watermill subscribe operations
@@ -44,19 +35,23 @@ type Subscriber struct {
 	outputsWg        sync.WaitGroup
 	SubscribersCount int
 	clientID         string
+
+	config SubscriberConfig
 }
 
 // NewSubscriber creates a new Subscriber.
 func NewSubscriber(config SubscriberConfig, logger watermill.LoggerAdapter) (*Subscriber, error) {
-	conn, err := pulsar.NewClient(pulsar.ClientOptions{URL: config.URL})
+	conn, err := pulsar.NewClient(pulsar.ClientOptions{
+		URL: config.URL,
+	})
 	if err != nil {
-		return nil, errors.Wrap(err, "cannot connect to Pulsar")
+		return nil, errors.Join(err, errors.New("cannot connect to Pulsar"))
 	}
-	return NewSubscriberWithPulsarClient(conn, logger)
+	return NewSubscriberWithPulsarClient(conn, config, logger)
 }
 
 // NewSubscriberWithPulsarClient creates a new Subscriber with the provided pulsar client.
-func NewSubscriberWithPulsarClient(conn pulsar.Client, logger watermill.LoggerAdapter) (*Subscriber, error) {
+func NewSubscriberWithPulsarClient(conn pulsar.Client, config SubscriberConfig, logger watermill.LoggerAdapter) (*Subscriber, error) {
 	if logger == nil {
 		logger = watermill.NopLogger{}
 	}
@@ -67,10 +62,11 @@ func NewSubscriberWithPulsarClient(conn pulsar.Client, logger watermill.LoggerAd
 		closing:  make(chan struct{}),
 		clientID: watermill.NewULID(),
 		subs:     make(map[string]pulsar.Consumer),
+		config:   config,
 	}, nil
 }
 
-// Subscribe subscribes messages from JetStream.
+// Subscribe subscribes messages from Pulsar.
 func (s *Subscriber) Subscribe(ctx context.Context, topic string) (<-chan *message.Message, error) {
 	output := make(chan *message.Message)
 
@@ -79,11 +75,16 @@ func (s *Subscriber) Subscribe(ctx context.Context, topic string) (<-chan *messa
 
 	sub, found := s.subs[topic]
 
+	subscriptionName := fmt.Sprintf("%s-%s", topic, s.clientID)
+	if s.config.SubscriberName != "" {
+		subscriptionName = s.config.SubscriberName
+	}
+
 	if !found {
 		sb, err := s.conn.Subscribe(pulsar.ConsumerOptions{
 			Topic:            topic,
-			SubscriptionName: fmt.Sprintf("%s-%s", topic, s.clientID),
-			Type:             pulsar.Exclusive,
+			SubscriptionName: subscriptionName,
+			Type:             s.config.SubscriberType,
 			MessageChannel:   make(chan pulsar.ConsumerMessage, 10),
 		})
 

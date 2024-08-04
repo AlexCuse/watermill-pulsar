@@ -39,9 +39,6 @@ lint:
 
 check: fmt vet lint
 
-generate_proto:
-	cd pkg/jetstream/wmpb && protoc --go_out=. *.proto
-
 update_watermill:
 	go get -u github.com/ThreeDotsLabs/watermill
 	go mod tidy

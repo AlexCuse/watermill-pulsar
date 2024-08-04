@@ -1,7 +1,7 @@
-# Watermill Jetstream Pub/Sub
+# Watermill Pulsar Pub/Sub
 <img align="right" width="200" src="https://threedots.tech/watermill-io/watermill-logo.png">
 
-This is Pub/Sub for the [Watermill](https://watermill.io/) project targeting [Apache Pulsar](https://docs.nats.io/nats-concepts/jetstream).
+This is Pub/Sub for the [Watermill](https://watermill.io/) project targeting [Apache Pulsar](https://pulsar.apache.org/).
 
 All Pub/Sub implementations can be found at [https://watermill.io/pubsubs/](https://watermill.io/pubsubs/).
 
